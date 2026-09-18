@@ -7,9 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="GGS Kasir Pro">
 <meta name="mobile-web-app-capable" content="yes">
-<link rel="manifest" href="./manifest.webmanifest">
-<link rel="apple-touch-icon" href="./icon-192.png">
-<title>GGS Kasir Pro 2026 — V11.10</title>
+<title>GGS Kasir Pro 2026 — V11.9 Kasir Nyaman</title>
 <style>
 :root{--dark:#111;--dark2:#1b1916;--gold:#c49a52;--ivory:#f6f1e8;--card:#fff;--line:#e7dfd2;--muted:#746f68;--ok:#2f7d54;--danger:#a53b3b}
 *{box-sizing:border-box}body{margin:0;background:var(--ivory);color:#191817;font:14px system-ui,-apple-system,Segoe UI,Arial}.app{display:flex;min-height:100vh}
@@ -173,7 +171,7 @@ button,input,select,textarea{font:inherit}button{touch-action:manipulation;curso
     <p>Login demo V3 • NIK + PIN • Hak akses bertingkat</p>
     <input id="loginNik" inputmode="numeric" placeholder="NIK">
     <input id="loginPin" type="password" inputmode="numeric" placeholder="PIN">
-    <button class="btn goldBtn" style="width:100%;margin-top:8px" onclick="ggsLogin()">MASUK</button>
+    <button id="ggsLoginBtn" type="button" class="btn goldBtn" style="width:100%;margin-top:8px">MASUK</button>
     <div class="loginHint">
       <b>Akun demo:</b><br>
       Owner — NIK 0001 / PIN 1234<br>
@@ -183,6 +181,47 @@ button,input,select,textarea{font:inherit}button{touch-action:manipulation;curso
     </div>
   </div>
 </div>
+
+<!-- V11.10.2 EARLY LOGIN: runs before the large app script so Android/iPhone can always submit NIK+PIN. -->
+<script>
+(function(){
+  var USERS={
+    "0001":{pin:"1234",name:"Owner GGS",role:"OWNER",branch:"Semua Cabang"},
+    "1001":{pin:"1234",name:"Admin Garut",role:"ADMIN",branch:"GGS Garut"},
+    "2001":{pin:"1234",name:"Head Capster Garut",role:"HEAD CAPSTER",branch:"GGS Garut"},
+    "3001":{pin:"1234",name:"Asep",role:"KEPSTER",branch:"GGS Garut",staffName:"Asep"}
+  };
+  function loginNow(){
+    try{
+      var nik=String(document.getElementById("loginNik").value||"").trim();
+      var pin=String(document.getElementById("loginPin").value||"").trim();
+      var u=USERS[nik];
+      if(!u || String(u.pin)!==pin){
+        var t=document.getElementById("toastBox");
+        if(t){t.textContent="NIK atau PIN salah";t.style.display="block";setTimeout(function(){t.style.display="none";},1800);}
+        return;
+      }
+      var session=Object.assign({},u,{nik:nik,allowedBranches:u.role==="OWNER"?["Semua Cabang"]:[u.branch]});
+      try{sessionStorage.setItem("GGS_SESSION",JSON.stringify(session));}catch(e){}
+      window.ggsUser=session;
+      var overlay=document.getElementById("loginOverlay");
+      if(overlay) overlay.style.display="none";
+      // Let the main app apply its role rules when available.
+      if(typeof window.applyGgsAccess==="function"){try{window.applyGgsAccess();}catch(e){}}
+      if(typeof window.toast==="function"){try{window.toast("Selamat datang, "+u.name);}catch(e){}}
+    }catch(e){
+      try{alert("Login GGS gagal dijalankan. Coba lagi.");}catch(ignore){}
+    }
+  }
+  function bind(){
+    var b=document.getElementById("ggsLoginBtn"),n=document.getElementById("loginNik"),p=document.getElementById("loginPin");
+    if(b){b.addEventListener("click",loginNow,false);b.addEventListener("touchend",function(ev){ev.preventDefault();loginNow();},false);}
+    [n,p].forEach(function(el){if(el)el.addEventListener("keydown",function(ev){if(ev.key==="Enter"){ev.preventDefault();loginNow();}},false);});
+  }
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bind);else bind();
+  window.ggsEarlyLogin=loginNow;
+})();
+</script>
 
 <div class="app">
 <aside>
@@ -1354,12 +1393,7 @@ function printSalarySlip(id){
  const w=window.open('','_blank','width=1000,height=1200');
  if(!w)return toast('Popup diblokir browser');
  const css=Array.from(document.querySelectorAll('style')).map(x=>x.innerHTML).join('\n');
- w.document.write(`<html><head><title>Slip Gaji ${staff.name}</title><style>${css} body{background:#fff;margin:0;padding:12px}.slipCard{border:0;padding:0}.slipActions{display:none!important}@media print{body{padding:0}.ggsSlip{box-shadow:none;border-radius:0;max-width:none;width:100%}}</style></head><body>${salarySlipHTML(staff)}<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
-}
-</script>
-</body></html>`);
+ w.document.write(`<html><head><title>Slip Gaji ${staff.name}</title><style>${css} body{background:#fff;margin:0;padding:12px}.slipCard{border:0;padding:0}.slipActions{display:none!important}@media print{body{padding:0}.ggsSlip{box-shadow:none;border-radius:0;max-width:none;width:100%}}</style></head><body>${salarySlipHTML(staff)}</body></html>`);
  w.document.close();w.focus();setTimeout(()=>w.print(),500);
 }
 function sendSalarySlipWA(id){
@@ -1728,12 +1762,7 @@ function printReceipt(){
  const isPdf=format==='pdf';
  const page=isPdf?'A5':(size==='58mm'?'58mm':size==='80mm'?'80mm':'A4');
  const pdfClass=isPdf?'receiptPdfPaper':'';
- w.document.write(`<html><head><title>${isPdf?'Bill Elektronik GGS HairStudio':'Struk GGS HairStudio'}</title><style>@page{size:${page} portrait;margin:0}html,body{margin:0;padding:0;background:#fff;font-family:Arial,sans-serif}body{display:flex;justify-content:center;align-items:flex-start}.receiptPaper{box-sizing:border-box;margin:0 auto;background:#fff;color:#111;border:0;border-radius:0;padding:8px 7px;line-height:1.35}.receipt58{width:58mm}.receipt80{width:80mm}.receiptA4{width:190mm;max-width:190mm}.receiptPdfPaper{width:148mm!important;max-width:148mm!important;padding:12mm 10mm!important;font-size:13px!important;line-height:1.5!important}.receiptLogoImg{max-width:62px;max-height:38px;width:auto;height:auto;object-fit:contain;margin:0 auto 4px;display:block}.receiptPdfPaper .receiptLogoImg{max-width:75px;max-height:52px}.receiptHeader{text-align:center;font-size:9px;color:#777}.receiptHeader b{display:block;font-size:12px;color:#111}.receiptPdfPaper .receiptHeader{font-size:12px}.receiptPdfPaper .receiptHeader b{font-size:18px}.receiptDivider{border:0;border-top:1px solid #ddd;margin:5px 0}.receiptMeta{display:grid;grid-template-columns:24% 76%;font-size:8.5px;gap:1px 3px}.receiptPdfPaper .receiptMeta{grid-template-columns:34% 66%;font-size:12px;gap:3px 6px}.receiptItems{border-top:1px dashed #aaa;border-bottom:1px dashed #aaa;padding:4px 0;margin:5px 0;font-size:8.5px}.receiptPdfPaper .receiptItems{font-size:12px;padding:8px 0;margin:8px 0}.receiptItemRow{display:grid;grid-template-columns:1fr auto auto;gap:4px;margin:2px 0}.receiptPdfPaper .receiptItemRow{gap:8px;margin:5px 0}.receiptMoney,.receiptPay{font-size:8.5px}.receiptPdfPaper .receiptMoney,.receiptPdfPaper .receiptPay{font-size:12px}.receiptTotal{display:flex;justify-content:space-between;font-size:11px;margin-top:4px;padding-top:4px;border-top:1px solid #ddd}.receiptPdfPaper .receiptTotal{font-size:17px;margin-top:8px;padding-top:7px}.receiptFooter{text-align:center;margin-top:6px;font-size:8px;color:#777;word-break:break-word}.receiptPdfPaper .receiptFooter{font-size:11px;margin-top:10px}.receiptElectronic{width:430px!important;max-width:430px!important;padding:20px!important;border:1px solid #ddd!important;border-radius:16px!important;box-shadow:none!important}</style></head><body>${receiptHTML()}<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
-}
-</script>
-</body></html>`);
+ w.document.write(`<html><head><title>${isPdf?'Bill Elektronik GGS HairStudio':'Struk GGS HairStudio'}</title><style>@page{size:${page} portrait;margin:0}html,body{margin:0;padding:0;background:#fff;font-family:Arial,sans-serif}body{display:flex;justify-content:center;align-items:flex-start}.receiptPaper{box-sizing:border-box;margin:0 auto;background:#fff;color:#111;border:0;border-radius:0;padding:8px 7px;line-height:1.35}.receipt58{width:58mm}.receipt80{width:80mm}.receiptA4{width:190mm;max-width:190mm}.receiptPdfPaper{width:148mm!important;max-width:148mm!important;padding:12mm 10mm!important;font-size:13px!important;line-height:1.5!important}.receiptLogoImg{max-width:62px;max-height:38px;width:auto;height:auto;object-fit:contain;margin:0 auto 4px;display:block}.receiptPdfPaper .receiptLogoImg{max-width:75px;max-height:52px}.receiptHeader{text-align:center;font-size:9px;color:#777}.receiptHeader b{display:block;font-size:12px;color:#111}.receiptPdfPaper .receiptHeader{font-size:12px}.receiptPdfPaper .receiptHeader b{font-size:18px}.receiptDivider{border:0;border-top:1px solid #ddd;margin:5px 0}.receiptMeta{display:grid;grid-template-columns:24% 76%;font-size:8.5px;gap:1px 3px}.receiptPdfPaper .receiptMeta{grid-template-columns:34% 66%;font-size:12px;gap:3px 6px}.receiptItems{border-top:1px dashed #aaa;border-bottom:1px dashed #aaa;padding:4px 0;margin:5px 0;font-size:8.5px}.receiptPdfPaper .receiptItems{font-size:12px;padding:8px 0;margin:8px 0}.receiptItemRow{display:grid;grid-template-columns:1fr auto auto;gap:4px;margin:2px 0}.receiptPdfPaper .receiptItemRow{gap:8px;margin:5px 0}.receiptMoney,.receiptPay{font-size:8.5px}.receiptPdfPaper .receiptMoney,.receiptPdfPaper .receiptPay{font-size:12px}.receiptTotal{display:flex;justify-content:space-between;font-size:11px;margin-top:4px;padding-top:4px;border-top:1px solid #ddd}.receiptPdfPaper .receiptTotal{font-size:17px;margin-top:8px;padding-top:7px}.receiptFooter{text-align:center;margin-top:6px;font-size:8px;color:#777;word-break:break-word}.receiptPdfPaper .receiptFooter{font-size:11px;margin-top:10px}.receiptElectronic{width:430px!important;max-width:430px!important;padding:20px!important;border:1px solid #ddd!important;border-radius:16px!important;box-shadow:none!important}</style></head><body>${receiptHTML()}</body></html>`);
  w.document.close(); setTimeout(()=>w.print(),400);
 }
 async function shareReceiptImage(){
@@ -1920,15 +1949,55 @@ branchServices = function(){
   return ggsOriginalBranchServices();
 };
 
+/* ===== V11.10.1 IPHONE SAFARI LOGIN FIX ===== */
+window.ggsLogin = function(){
+  try{
+    const nikEl=document.getElementById('loginNik');
+    const pinEl=document.getElementById('loginPin');
+    const nik=String(nikEl?.value||'').trim();
+    const pin=String(pinEl?.value||'').trim();
+    const users={
+      '0001':{pin:'1234',name:'Owner GGS',role:'OWNER',branch:'Semua Cabang'},
+      '1001':{pin:'1234',name:'Admin Garut',role:'ADMIN',branch:'GGS Garut'},
+      '2001':{pin:'1234',name:'Head Capster Garut',role:'HEAD CAPSTER',branch:'GGS Garut'},
+      '3001':{pin:'1234',name:'Asep',role:'KEPSTER',branch:'GGS Garut',staffName:'Asep'}
+    };
+    let u=users[nik];
+    if(!u && typeof state!=='undefined' && Array.isArray(state.staff)){
+      const st=state.staff.find(x=>String(x.nik||'').trim()===nik && String(x.pin||'').trim()===pin);
+      if(st){
+        let role=String(st.role||'KEPSTER').toUpperCase();
+        if(role==='CAPSTER') role='KEPSTER';
+        u={pin:String(st.pin||''),name:st.name,role,branch:st.branch,staffName:st.name,staffId:st.id};
+      }
+    }
+    if(!u || String(u.pin)!==pin){
+      if(typeof toast==='function') toast('NIK atau PIN salah');
+      else alert('NIK atau PIN salah');
+      return false;
+    }
+    ggsUser=Object.assign({},u,{nik});
+    try{sessionStorage.setItem('GGS_SESSION',JSON.stringify(ggsUser));}catch(e){}
+    const overlay=document.getElementById('loginOverlay');
+    if(overlay) overlay.style.display='none';
+    try{
+      if(typeof applyGgsAccess==='function') applyGgsAccess();
+    }catch(e){
+      /* Login must still succeed even if a secondary access widget fails on Safari. */
+    }
+    try{if(typeof toast==='function') toast('Selamat datang, '+u.name);}catch(e){}
+    return false;
+  }catch(err){
+    const msg='Login GGS gagal dijalankan. Silakan coba lagi.';
+    try{if(typeof toast==='function') toast(msg);else alert(msg);}catch(e){}
+    return false;
+  }
+};
+
 ggsRestore();
 ensureV11State();
 setTimeout(()=>{renderAttendance();renderCustomers();renderStaff();renderServices();renderBooking();renderKasir();},50);
 
 go('dashboard');
-</script>
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
-}
 </script>
 </body></html>
